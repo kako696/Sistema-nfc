@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector NFC Web</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f6f8;
+            color: #333;
+        }
+
+        .card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+
+        button {
+            background-color: #0066ff;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        button:disabled {
+            background-color: #a0c4ff;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background-color: #eef2f7;
+            color: #4a5568;
+        }
+
+        .status.active {
+            background-color: #e6fffa;
+            color: #234e52;
+            border: 1px solid #b2f5ea;
+        }
+
+        .status.error {
+            background-color: #fff5f5;
+            color: #9b2c2c;
+            border: 1px solid #feb2b2;
+        }
+
+        .output {
+            margin-top: 20px;
+            text-align: left;
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Lector de Tarjetas NFC</h1>
+        <button id="btnScan">Iniciar Escaneo NFC</button>
+        <div id="status" class="status">Presiona el botón para comenzar.</div>
+        <div id="output" class="output" style="display: none;"></div>
+    </div>
+
+    <script>
+        const btnScan = document.getElementById('btnScan');
+        const statusDiv = document.getElementById('status');
+        const outputDiv = document.getElementById('output');
+
+        function updateStatus(message, type = '') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function logOutput(data) {
+            outputDiv.style.display = 'block';
+            outputDiv.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+        }
+
+        btnScan.addEventListener('click', async () => {
+            // 1. Verificar si la API Web NFC está disponible
+            if (!('NDEFReader' in window)) {
+                updateStatus('La API Web NFC no está soportada en este navegador o dispositivo.', 'error');
+                logOutput('Requisitos:\n- Chrome para Android\n- Dispositivo móvil con chip NFC activo\n- Conexión HTTPS segura');
+                return;
+            }
+
+            try {
+                // 2. Crear instancia del lector NDEF
+                const ndef = new NDEFReader();
+
+                // 3. Iniciar el escaneo (solicita permisos la primera vez)
+                await ndef.scan();
+                
+                updateStatus('Acerca una tarjeta o etiqueta NFC al reverso del teléfono...', 'active');
+                btnScan.disabled = true;
+
+                // 4. Capturar errores de lectura
+                ndef.addEventListener("readingerror", () => {
+                    updateStatus('Error al intentar leer la tarjeta. Inténtalo de nuevo.', 'error');
+                });
+
+                // 5. Capturar los datos cuando se detecta una tarjeta
+                ndef.addEventListener("reading", ({ message, serialNumber }) => {
+                    updateStatus('¡Tarjeta NFC detectada con éxito!', 'active');
+
+                    let cardData = {
+                        numeroSerie: serialNumber || "No disponible (ID protegido)",
+                        registrosNDEF: []
+                    };
+
+                    // Recorrer los registros NDEF contenidos en la tarjeta
+                    for (const record of message.records) {
+                        let recordContent = "";
+
+                        if (record.recordType === "text") {
+                            const textDecoder = new TextDecoder(record.encoding || "utf-8");
+                            recordContent = textDecoder.decode(record.data);
+                        } else if (record.recordType === "url") {
+                            const textDecoder = new TextDecoder();
+                            recordContent = textDecoder.decode(record.data);
+                        } else {
+                            recordContent = `Tipo de registro no formateado (${record.recordType})`;
+                        }
+
+                        cardData.registrosNDEF.push({
+                            tipo: record.recordType,
+                            contenido: recordContent
+                        });
+                    }
+
+                    logOutput(cardData);
+                });
+
+            } catch (error) {
+                updateStatus(`Error: ${error.message || error}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
