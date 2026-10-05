@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector de Código de Barras</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f4f4f9;
+      padding: 10px;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    #reader {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .result-box {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #e9ecef;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #28a745;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h3>Lector de Etiquetas</h3>
+    <div id="reader"></div>
+    <div style="margin-top: 10px; text-align: left; font-size: 13px; color: #555;">Última lectura:</div>
+    <div class="result-box" id="result">Esperando cámara...</div>
+  </div>
+
+  <script>
+    function onScanSuccess(decodedText) {
+      document.getElementById('result').innerText = decodedText;
+    }
+
+    // Inicializar la cámara trasera directamente
+    const html5QrCode = new Html5Qrcode("reader");
+    
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        // Seleccionar la cámara trasera preferentemente
+        let backCamera = devices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera'));
+        let cameraId = backCamera ? backCamera.id : devices[0].id;
+
+        html5QrCode.start(
+          cameraId, 
+          { fps: 10, qrbox: { width: 250, height: 150 } },
+          onScanSuccess
+        );
+      } else {
+        document.getElementById('result').innerText = "No se detectaron cámaras.";
+      }
+    }).catch(err => {
+      document.getElementById('result').innerText = "Error o permiso denegado: " + err;
+    });
+  </script>
+</body>
+</html>
